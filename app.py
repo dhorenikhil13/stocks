@@ -38,10 +38,11 @@ def get_price_and_volume(tickers, date):
 # ---- Streamlit UI ----
 st.title("S&P 500 Stock Price Viewer")
 date_input = st.date_input("Pick a date", value=datetime.today() - timedelta(days=1))
-num_tickers = st.slider("Number of tickers", 5, 50, 10)
+num_tickers = st.slider("Number of tickers", 5, 10, 50, 100, 250, 500)
 
 if st.button("Fetch Data"):
     tickers = get_spy_tickers()[:num_tickers]
     df = get_price_and_volume(tickers, date_input.strftime("%Y-%m-%d"))
     st.dataframe(df)
     st.download_button("Download as CSV", df.to_csv().encode('utf-8'), "stock_data.csv", "text/csv")
+
