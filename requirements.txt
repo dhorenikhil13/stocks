@@ -1,5 +1,6 @@
 yfinance
 pandas
-plotly
-streamlit
+matplotlib
 tqdm
+plotly
+lxml
