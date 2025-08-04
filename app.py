@@ -158,7 +158,7 @@ st.title("📊 Price vs Volume Change for High-Value Stocks")
 index_name = st.selectbox("Select Index", ["QQQ", "SPY"])
 start_date = st.date_input("Start Date", datetime(2025, 1, 2))
 end_date = st.date_input("End Date", datetime(2025, 7, 22))
-volume_threshold = st.slider("Volume % Change Threshold", min_value=10, max_value=300, value=100, step=10)
+volume_threshold = st.slider("Volume % Change Threshold", min_value=10, max_value=5000, value=100, step=10)
 
 if st.button("Run Analysis"):
     with st.spinner("Fetching tickers..."):
@@ -174,3 +174,4 @@ if st.button("Run Analysis"):
 
     fig = plot_interactive_bubble(df_changes, index_name, str(start_date), str(end_date), volume_threshold)
     st.plotly_chart(fig, use_container_width=True)
+
