@@ -1,8 +1,5 @@
-streamlit
 yfinance
 pandas
-lxml
-
-
-
-
+plotly
+streamlit
+tqdm
