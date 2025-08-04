@@ -144,7 +144,7 @@ st.title("📊 Stock Movement Visualizer (Price vs Volume)")
 index_name = st.selectbox("Select Index:", ["QQQ", "SPY"])
 start_date = st.date_input("Start Date", datetime(2025, 1, 2))
 end_date = st.date_input("End Date", datetime(2025, 7, 22))
-threshold = st.slider("Minimum Current Price ($)", min_value=0, max_value=500, value=100, step=10)
+threshold = st.slider("Minimum Current Price ($)", min_value=0, max_value=5000, value=100, step=10)
 
 if st.button("🔍 Analyze"):
     with st.spinner(f"Fetching {index_name} tickers and processing data..."):
@@ -160,3 +160,4 @@ if st.button("🔍 Analyze"):
             else:
                 fig = plot_interactive_bubble(df_changes, index_name, str(start_date), str(end_date))
                 st.plotly_chart(fig, use_container_width=True)
+
