@@ -84,19 +84,19 @@ def get_price_and_volume_change(tickers, start_date, end_date):
     return pd.DataFrame(data)
 
 # === Interactive Plotting ===
-def plot_interactive_bubble(df, index_name, start_date, end_date):
+def plot_interactive_bubble(df, index_name, start_date, end_date, volume_threshold):
     # Categorize
     def categorize(row):
         p, v = row['Price Change %'], row['Volume Change %']
-        if p < 0 and v > 100:
+        if p < 0 and v > volume_threshold:
             return 'Sell - High Vol'
         elif p < 0:
             return 'Sell - Low Vol'
-        elif 0 <= p < 30 and v > 100:
+        elif 0 <= p < 30 and v > volume_threshold:
             return 'Hold - High Vol'
         elif 0 <= p < 30:
             return 'Hold - Low Vol'
-        elif p >= 30 and v > 100:
+        elif p >= 30 and v > volume_threshold:
             return 'Star - High Vol'
         else:
             return 'Star - Low Vol'
@@ -158,6 +158,7 @@ st.title("📊 Price vs Volume Change for High-Value Stocks")
 index_name = st.selectbox("Select Index", ["QQQ", "SPY"])
 start_date = st.date_input("Start Date", datetime(2025, 1, 2))
 end_date = st.date_input("End Date", datetime(2025, 7, 22))
+volume_threshold = st.slider("Volume % Change Threshold", min_value=10, max_value=300, value=100, step=10)
 
 if st.button("Run Analysis"):
     with st.spinner("Fetching tickers..."):
@@ -171,5 +172,5 @@ if st.button("Run Analysis"):
 
     st.success(f"Found {len(df_changes)} stocks over $100 with valid data.")
 
-    fig = plot_interactive_bubble(df_changes, index_name, str(start_date), str(end_date))
+    fig = plot_interactive_bubble(df_changes, index_name, str(start_date), str(end_date), volume_threshold)
     st.plotly_chart(fig, use_container_width=True)
