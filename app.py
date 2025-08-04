@@ -34,7 +34,7 @@ def get_index_tickers(index="SPY"):
         tickers = [t.replace('.', '-') for t in df[column].tolist()]
         return tickers
     except Exception as e:
-        print(f"❌ Failed to fetch {index} tickers: {e}")
+        print(f"\u274c Failed to fetch {index} tickers: {e}")
         return []
 
 # === Filter stocks above $100 ===
@@ -74,7 +74,7 @@ def get_price_and_volume_change(tickers, start_date, end_date):
                 'Ticker': ticker,
                 'Price Change %': float(round(price_pct_change, 2)),
                 'Volume Change %': float(round(volume_pct_change, 2)),
-                'Price': float(round(close_price, 2))
+                'Current Price': float(round(close_price, 2))
             })
 
         except Exception as e:
@@ -83,9 +83,9 @@ def get_price_and_volume_change(tickers, start_date, end_date):
 
     return pd.DataFrame(data)
 
-# === Plotting interactive bubble chart ===
+# === Interactive Plotting ===
 def plot_interactive_bubble(df, index_name, start_date, end_date):
-    # Categorize into 6 groups
+    # Categorize
     def categorize(row):
         p, v = row['Price Change %'], row['Volume Change %']
         if p < 0 and v > 100:
@@ -103,7 +103,6 @@ def plot_interactive_bubble(df, index_name, start_date, end_date):
 
     df['Category'] = df.apply(categorize, axis=1)
 
-    # Color mapping
     color_map = {
         'Sell - High Vol': '#8B0000',
         'Sell - Low Vol': '#FFA07A',
@@ -113,51 +112,64 @@ def plot_interactive_bubble(df, index_name, start_date, end_date):
         'Star - Low Vol': '#90EE90'
     }
 
-    df['Color'] = df['Category'].map(color_map)
-
-    # Show text labels only for certain categories
-    label_mask = df['Category'].isin(['Sell - High Vol', 'Hold - High Vol', 'Star - High Vol', 'Star - Low Vol'])
-    df['Label'] = df['Ticker'].where(label_mask, '')
-
     fig = px.scatter(
         df,
         x='Price Change %',
         y='Volume Change %',
         color='Category',
         color_discrete_map=color_map,
-        hover_data={'Ticker': True, 'Price': True, 'Price Change %': True, 'Volume Change %': True},
-        text='Label',
-        size_max=30,
-        size=[8] * len(df),
-        title=f'{index_name} Stocks: Price vs Volume Change<br>({start_date} → {end_date})'
+        hover_name='Ticker',
+        hover_data={'Price Change %': True, 'Volume Change %': True, 'Current Price': True},
+        size=[5]*len(df),
+        title=f'{index_name} Stocks: Price vs Volume Change ({start_date} → {end_date})',
+        width=1000,
+        height=600
     )
 
-    fig.update_traces(marker=dict(line=dict(width=1, color='DarkSlateGrey')))
-    fig.update_layout(title_x=0.5)
+    # Add ticker labels for select categories
+    for category in df['Category'].unique():
+        group = df[df['Category'] == category]
+        show_labels = category in [
+            'Sell - High Vol',
+            'Hold - High Vol',
+            'Star - High Vol',
+            'Star - Low Vol'
+        ]
+        for _, row in group.iterrows():
+            if show_labels:
+                text_color = 'white' if category == 'Star - High Vol' else 'black'
+                fig.add_annotation(
+                    x=row['Price Change %'],
+                    y=row['Volume Change %'],
+                    text=row['Ticker'],
+                    showarrow=False,
+                    font=dict(color=text_color, size=10),
+                    bgcolor='rgba(0,0,0,0.4)' if category == 'Star - High Vol' else 'rgba(255,255,255,0.6)',
+                    opacity=0.8
+                )
 
+    fig.update_layout(legend_title="Category")
     return fig
 
-# === Streamlit UI ===
+# === Streamlit App ===
 st.set_page_config(layout="wide")
-st.title("📊 Stock Movement Visualizer (Price vs Volume)")
+st.title("📊 Price vs Volume Change for High-Value Stocks")
 
-index_name = st.selectbox("Select Index:", ["QQQ", "SPY"])
+index_name = st.selectbox("Select Index", ["QQQ", "SPY"])
 start_date = st.date_input("Start Date", datetime(2025, 1, 2))
 end_date = st.date_input("End Date", datetime(2025, 7, 22))
-threshold = st.slider("Minimum Current Price ($)", min_value=0, max_value=5000, value=100, step=10)
 
-if st.button("🔍 Analyze"):
-    with st.spinner(f"Fetching {index_name} tickers and processing data..."):
+if st.button("Run Analysis"):
+    with st.spinner("Fetching tickers..."):
         tickers = get_index_tickers(index=index_name)
-        if not tickers:
-            st.error("Failed to fetch tickers. Please check your internet or ticker source.")
-        else:
-            tickers_over_threshold = filter_high_price_tickers(tickers, threshold)
-            df_changes = get_price_and_volume_change(tickers_over_threshold, str(start_date), str(end_date))
 
-            if df_changes.empty:
-                st.warning("No data available after filtering. Try a different date range or threshold.")
-            else:
-                fig = plot_interactive_bubble(df_changes, index_name, str(start_date), str(end_date))
-                st.plotly_chart(fig, use_container_width=True)
+    with st.spinner("Filtering stocks over $100..."):
+        tickers_over_100 = filter_high_price_tickers(tickers, threshold=100)
 
+    with st.spinner("Calculating price and volume changes..."):
+        df_changes = get_price_and_volume_change(tickers_over_100, str(start_date), str(end_date))
+
+    st.success(f"Found {len(df_changes)} stocks over $100 with valid data.")
+
+    fig = plot_interactive_bubble(df_changes, index_name, str(start_date), str(end_date))
+    st.plotly_chart(fig, use_container_width=True)
