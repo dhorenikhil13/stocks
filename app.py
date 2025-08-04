@@ -87,20 +87,21 @@ def get_price_and_volume_change(tickers, start_date, end_date):
 # === Plotly Bubble Chart ===
 def plot_interactive_bubble(df, index_name, start_date, end_date):
     def categorize(row):
-        p = row['Price Change %']
-        v = row['Volume Change %']
+        p = float(row['Price Change %'])
+        v = float(row['Volume Change %'])
+    
         if p < 0 and v > 100:
-            return 'Sell - High Vol'
+            return 'Sell - High Vol'       # dark red
         elif p < 0:
-            return 'Sell - Low Vol'
+            return 'Sell - Low Vol'        # light red
         elif 0 <= p < 30 and v > 100:
-            return 'Hold - High Vol'
+            return 'Hold - High Vol'       # dark blue
         elif 0 <= p < 30:
-            return 'Hold - Low Vol'
+            return 'Hold - Low Vol'        # light blue
         elif p >= 30 and v > 100:
-            return 'Star - High Vol'
+            return 'Star - High Vol'       # dark green
         else:
-            return 'Star - Low Vol'
+            return 'Star - Low Vol'        # light green
 
     df['Category'] = df.apply(categorize, axis=1)
 
@@ -165,3 +166,4 @@ if st.button("Run Analysis"):
     st.success("✅ Done! Showing results:")
     fig = plot_interactive_bubble(df_changes, index_name, str(start_date), str(end_date))
     st.plotly_chart(fig, use_container_width=True)
+
