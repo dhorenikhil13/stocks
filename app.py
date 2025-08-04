@@ -1,16 +1,9 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Mon Aug  4 11:57:49 2025
-
-@author: dhore
-"""
-
 import yfinance as yf
 import pandas as pd
 import plotly.express as px
-import streamlit as st
 from datetime import datetime, timedelta
 from tqdm import tqdm
+import streamlit as st
 
 # === Get current price ===
 def get_current_price(ticker):
@@ -22,8 +15,8 @@ def get_current_price(ticker):
         return None
     return None
 
-# === Get tickers by index: 'SPY' or 'QQQ' ===
-def get_index_tickers(index="SPY"):
+# === Get tickers by index ===
+def get_index_tickers(index="QQQ"):
     if index == "SPY":
         url = "https://en.wikipedia.org/wiki/List_of_S%26P_500_companies"
         table_index = 0
@@ -56,6 +49,7 @@ def filter_high_price_tickers(tickers, threshold=100):
 # === Calculate % change ===
 def get_price_and_volume_change(tickers, start_date, end_date):
     data = []
+
     for ticker in tqdm(tickers, desc="Fetching % changes"):
         try:
             df = yf.download(
@@ -64,8 +58,10 @@ def get_price_and_volume_change(tickers, start_date, end_date):
                 end=(datetime.strptime(end_date, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d"),
                 progress=False
             )
+
             if df.empty or len(df) < 2:
                 continue
+
             open_price = df['Close'].iloc[0]
             close_price = df['Close'].iloc[-1]
             open_vol = df['Volume'].iloc[0]
@@ -76,32 +72,38 @@ def get_price_and_volume_change(tickers, start_date, end_date):
 
             data.append({
                 'Ticker': ticker,
-                'Price Change %': round(price_pct_change, 2),
-                'Volume Change %': round(volume_pct_change, 2),
-                'Price': round(close_price, 2)
+                'Price Change %': float(round(price_pct_change, 2)),
+                'Volume Change %': float(round(volume_pct_change, 2)),
+                'Current Price': float(round(close_price, 2))
             })
+
         except Exception as e:
+            print(f"Error with {ticker}: {e}")
             continue
+
     return pd.DataFrame(data)
 
-# === Plotly Bubble Chart ===
+# === Interactive Plotting ===
 def plot_interactive_bubble(df, index_name, start_date, end_date):
+    df['Price Change %'] = pd.to_numeric(df['Price Change %'], errors='coerce')
+    df['Volume Change %'] = pd.to_numeric(df['Volume Change %'], errors='coerce')
+    df = df.dropna(subset=['Price Change %', 'Volume Change %'])
+
     def categorize(row):
         p = float(row['Price Change %'])
         v = float(row['Volume Change %'])
-    
         if p < 0 and v > 100:
-            return 'Sell - High Vol'       # dark red
+            return 'Sell - High Vol'
         elif p < 0:
-            return 'Sell - Low Vol'        # light red
+            return 'Sell - Low Vol'
         elif 0 <= p < 30 and v > 100:
-            return 'Hold - High Vol'       # dark blue
+            return 'Hold - High Vol'
         elif 0 <= p < 30:
-            return 'Hold - Low Vol'        # light blue
+            return 'Hold - Low Vol'
         elif p >= 30 and v > 100:
-            return 'Star - High Vol'       # dark green
+            return 'Star - High Vol'
         else:
-            return 'Star - Low Vol'        # light green
+            return 'Star - Low Vol'
 
     df['Category'] = df.apply(categorize, axis=1)
 
@@ -115,6 +117,8 @@ def plot_interactive_bubble(df, index_name, start_date, end_date):
     }
 
     df['Color'] = df['Category'].map(color_map)
+    df['Volume Label'] = (df['Volume Change %']).map(lambda x: f"{x:.2f}%")
+    df['Hover'] = df.apply(lambda x: f"{x['Ticker']}<br>Price: ${x['Current Price']}<br>Price Δ: {x['Price Change %']}%<br>Vol Δ: {x['Volume Change %']}%", axis=1)
 
     fig = px.scatter(
         df,
@@ -122,48 +126,39 @@ def plot_interactive_bubble(df, index_name, start_date, end_date):
         y='Volume Change %',
         color='Category',
         color_discrete_map=color_map,
-        hover_data={
-            'Ticker': True,
-            'Price': True,
-            'Price Change %': ':.2f',
-            'Volume Change %': ':.2f',
-            'Category': False,
-            'Color': False
-        },
-        size_max=30,
-        size=[10]*len(df),
-        opacity=0.7
+        hover_name='Ticker',
+        hover_data={'Price Change %': True, 'Volume Change %': True, 'Ticker': False, 'Color': False, 'Current Price': True},
+        text=df.apply(lambda x: x['Ticker'] if 'Low Vol' not in x['Category'] else '', axis=1),
+        size=[12]*len(df),
+        opacity=0.8
     )
 
-    fig.update_traces(marker=dict(line=dict(width=1, color='DarkSlateGrey')))
+    fig.update_traces(textposition='top center', marker=dict(line=dict(width=0.5, color='DarkSlateGrey')))
     fig.update_layout(
-        title=f'{index_name} Stocks: Price vs Volume Change ({start_date} → {end_date})',
-        xaxis_title='Price % Change',
-        yaxis_title='Volume % Change',
-        template='plotly_white',
+        title=f"{index_name} Stocks: Price vs Volume Change ({start_date} → {end_date})",
+        xaxis_title=f"📈 Price % Change",
+        yaxis_title=f"📊 Volume % Change",
+        legend_title="Category",
         height=700
     )
+
     return fig
 
-# === Streamlit App ===
-st.set_page_config(layout="wide")
-st.title("📊 Stock Bubble Chart: Price vs Volume Change")
+# === Streamlit UI ===
+st.title("📊 Price vs Volume Change for High-Price Stocks")
 
-index_name = st.selectbox("Choose Index", ["QQQ", "SPY"], index=0)
+index_name = st.selectbox("Select Index", ["QQQ", "SPY"])
 start_date = st.date_input("Start Date", datetime(2025, 1, 2))
 end_date = st.date_input("End Date", datetime(2025, 7, 22))
 
-if st.button("Run Analysis"):
-    with st.spinner(f"📥 Fetching {index_name} tickers..."):
-        tickers = get_index_tickers(index=index_name)
+if st.button("Generate Chart"):
+    tickers = get_index_tickers(index=index_name)
+    if not tickers:
+        st.stop()
 
-    with st.spinner("🔎 Filtering tickers with price > $100..."):
-        tickers_over_100 = filter_high_price_tickers(tickers, threshold=100)
+    tickers_over_100 = filter_high_price_tickers(tickers)
+    df_changes = get_price_and_volume_change(tickers_over_100, str(start_date), str(end_date))
+    st.dataframe(df_changes)
 
-    with st.spinner("📊 Getting stock changes..."):
-        df_changes = get_price_and_volume_change(tickers_over_100, str(start_date), str(end_date))
-
-    st.success("✅ Done! Showing results:")
     fig = plot_interactive_bubble(df_changes, index_name, str(start_date), str(end_date))
     st.plotly_chart(fig, use_container_width=True)
-
